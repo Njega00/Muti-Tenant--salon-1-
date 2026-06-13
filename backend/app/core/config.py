@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Salon Multi-Tenant Platform"
     API_V1_PREFIX: str = "/api/v1"
 
-    DATABASE_URL: str = 'postgresql://neondb_owner:npg_uorD58hQCiLj@ep-square-moon-apfr2j9j-pooler.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+    DATABASE_URL: str = psql 'postgresql://neondb_owner:npg_PsWi4kETyA2t@ep-square-moon-apfr2j9j-pooler.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
     SECRET_KEY: str = "Mukanga" 
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30

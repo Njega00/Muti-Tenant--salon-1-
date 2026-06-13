@@ -16,3 +16,29 @@ backend/.env
 .vscode/
 .idea/
 .DS_Store
+
+.env
+.env.*
+*.env
+
+# Python Virtual Environments
+venv/
+ENV/
+env/
+.venv/
+
+# Python Cache and Compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Databases (if you ever use local sqlite)
+*.db
+*.sqlite3
+
+# Operating System Files
+.DS_Store
+Thumbs.db

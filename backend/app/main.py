@@ -5,11 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.db.connection import get_db, engine  
-from app.models.auth import Base 
-Base.metadata.create_all(bind=engine) 
+from app.db.connection import engine, get_db
+from app.db.base import Base
 
-
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -27,6 +26,7 @@ app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 @app.get("/")
 def root() -> dict[str, str]:
     return {"name": settings.PROJECT_NAME, "docs": "/docs"}
+
 
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):

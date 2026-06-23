@@ -39,4 +39,4 @@ Every single table in our system (except the `tenants` directory itself) contain
 * **`users` / `staff`**: The human actors within a workspace (Owner, administrative staff, master barbers, beauty experts).
 * **`customers`**: Isolated client databases specific to each tenant's business history.
 * **`services` / `products`**: Custom treatment catalogs (Pricing, duration requirements) and physical retail inventories.
-* **`bookings` / `sales`**: The primary operational transactional tables monitoring salon calendars and daily cash registers.
+* **`bookings` / `sales`**: The primary operational transactional tables monitoring salon calendars and daily cash registers

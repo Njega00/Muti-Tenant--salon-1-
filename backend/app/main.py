@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.db.connection import engine, get_db
 from app.db.base import Base
 
-Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(title=settings.PROJECT_NAME)
 

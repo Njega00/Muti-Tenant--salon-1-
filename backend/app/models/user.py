@@ -1,7 +1,7 @@
 # app/models/user.py
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
-from app.db.base import Base  # adjust import to match your project
+from app.db.connection import Base  # adjust import to match your project
 
 
 class User(Base):

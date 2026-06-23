@@ -19,3 +19,5 @@ class Tenant(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
+    
+    

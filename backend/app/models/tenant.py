@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, DateTime, Integer, String, func
 from sqlalchemy.orm import relationship
 
-from app.db.session import Base
+from app.db.connection import Base
 
 
 class Tenant(Base):

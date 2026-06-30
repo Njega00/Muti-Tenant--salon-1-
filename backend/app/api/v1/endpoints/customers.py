@@ -1,14 +1,41 @@
 # app/api/v1/endpoints/customers.py
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_tenant  # Adjust path to your security deps
+from app.db.connection import get_db
 from app.crud.crud_customer import customer_crud
 from app.schemas.customer import CustomerCreate, CustomerUpdate, CustomerOut
 from app.models.tenant import Tenant
 
 router = APIRouter()
+
+# 🚀 INLINE TENANT DEPENDENCY MIDDLEWARE
+def get_current_tenant(request: Request, db: Session = Depends(get_db)) -> Tenant:
+    """
+    Extracts the tenant dynamically via X-Tenant-ID header or the subdomain host header.
+    """
+    # 1. Look for a custom staging header, fallback to parsing subdomains (e.g., 'executive-kings.salon.com')
+    tenant_identifier = request.headers.get("X-Tenant-ID") or request.headers.get("host", "").split(".")[0]
+    
+    if not tenant_identifier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing tenant context mapping identification metadata."
+        )
+        
+    # 2. Match the database tenant row criteria
+    tenant = db.query(Tenant).filter(
+        (Tenant.subdomain == tenant_identifier) | (Tenant.name == tenant_identifier)
+    ).first()
+    
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Requested salon workspace partition not found."
+        )
+    return tenant
+
 
 @router.post("/", response_model=CustomerOut, status_code=status.HTTP_201_CREATED)
 def create_customer(

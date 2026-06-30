@@ -1,87 +1,86 @@
 # app/api/v1/endpoints/services.py
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
 from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.orm import Session
 
 from app.db.connection import get_db
-from app.core.deps import get_current_user, require_role, CurrentUser
-from app.models.service import Service  # Assumes your model class is named Service
-from app.schemas.service import ServiceCreate, ServiceUpdate, ServiceResponse
+from app.crud.crud_service import service_crud
+from app.schemas.service import ServiceCreate, ServiceUpdate, ServiceOut
+from app.models.tenant import Tenant
 
 router = APIRouter()
 
-@router.post("/", response_model=ServiceResponse, status_code=status.HTTP_201_CREATED)
-def create_service(
-    payload: ServiceCreate,
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role("owner", "manager"))
-):
-    """Create a new service explicitly tied to the authenticated tenant."""
-    new_service = Service(
-        tenant_id=current_user.tenant_id,
-        name=payload.name,
-        description=payload.description,
-        price=payload.price,
-        duration_minutes=payload.duration_minutes
-    )
-    db.add(new_service)
-    db.commit()
-    db.refresh(new_service)
-    return new_service
-
-
-@router.get("/", response_model=List[ServiceResponse])
-def list_services(
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user)  # Any staff can view
-):
-    """Retrieve all services belonging exclusively to this salon tenant."""
-    # The filter ensures complete tenant isolation
-    services = db.query(Service).filter(Service.tenant_id == current_user.tenant_id).all()
-    return services
-
-
-@router.put("/{service_id}", response_model=ServiceResponse)
-def update_service(
-    service_id: int,
-    payload: ServiceUpdate,
-    db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role("owner", "manager"))
-):
-    """Modify a service, verifying ownership before processing."""
-    service = db.query(Service).filter(
-        Service.id == service_id, 
-        Service.tenant_id == current_user.tenant_id
+# Reusing our rock-solid dynamic tenant resolution dependency
+def get_current_tenant(request: Request, db: Session = Depends(get_db)) -> Tenant:
+    tenant_identifier = request.headers.get("X-Tenant-ID") or request.headers.get("host", "").split(".")[0]
+    if not tenant_identifier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing tenant context mapping identification metadata."
+        )
+    tenant = db.query(Tenant).filter(
+        (Tenant.subdomain == tenant_identifier) | (Tenant.name == tenant_identifier)
     ).first()
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Requested salon workspace partition not found."
+        )
+    return tenant
 
+
+@router.post("/", response_model=ServiceOut, status_code=status.HTTP_201_CREATED)
+def create_service(
+    *,
+    db: Session = Depends(get_db),
+    obj_in: ServiceCreate,
+    current_tenant: Tenant = Depends(get_current_tenant)
+):
+    """Add a new item to the salon's service menu catalog."""
+    return service_crud.create_with_tenant(db, obj_in=obj_in, tenant_id=current_tenant.id)
+
+
+@router.get("/", response_model=List[ServiceOut])
+def read_services(
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 100,
+    current_tenant: Tenant = Depends(get_current_tenant)
+):
+    """Retrieve all menu services belonging to this tenant workspace."""
+    return service_crud.get_multi_by_tenant(
+        db, tenant_id=current_tenant.id, skip=skip, limit=limit
+    )
+
+
+@router.get("/{service_id}", response_model=ServiceOut)
+def read_service_by_id(
+    service_id: int,
+    db: Session = Depends(get_db),
+    current_tenant: Tenant = Depends(get_current_tenant)
+):
+    """Fetch a specific service item after validating workspace tenant scope alignment."""
+    service = service_crud.get_by_id(db, tenant_id=current_tenant.id, service_id=service_id)
     if not service:
-        raise HTTPException(status_code=404, detail="Service not found in this salon workspace")
-
-    # Update only fields provided in the payload
-    update_data = payload.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(service, field, value)
-
-    db.commit()
-    db.refresh(service)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Service catalog item not found in this workspace context."
+        )
     return service
 
 
-@router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_service(
+@router.put("/{service_id}", response_model=ServiceOut)
+def update_service_item(
     service_id: int,
+    obj_in: ServiceUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role("owner"))
+    current_tenant: Tenant = Depends(get_current_tenant)
 ):
-    """Completely remove a service from the tenant catalog."""
-    service = db.query(Service).filter(
-        Service.id == service_id, 
-        Service.tenant_id == current_user.tenant_id
-    ).first()
-
+    """Modify pricing, duration, or descriptions on a specific menu item."""
+    service = service_crud.get_by_id(db, tenant_id=current_tenant.id, service_id=service_id)
     if not service:
-        raise HTTPException(status_code=404, detail="Service not found in this salon workspace")
-
-    db.delete(service)
-    db.commit()
-    return None
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target service item unavailable or invalid."
+        )
+    return service_crud.update(db, db_obj=service, obj_in=obj_in)

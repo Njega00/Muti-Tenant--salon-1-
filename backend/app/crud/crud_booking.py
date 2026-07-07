@@ -2,6 +2,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.models.booking import Booking  # Assumes your model is named Booking
+from app.models.booking_service import BookingService
 from app.models.customer import Customer
 from app.models.service import Service
 from app.schemas.booking import BookingCreate, BookingUpdate
@@ -26,20 +27,50 @@ class CRUDBooking:
     ) -> Booking:
         # 🔒 Multi-Tenant Cross Validation Check
         customer_exists = db.query(Customer).filter(Customer.id == obj_in.customer_id, Customer.tenant_id == tenant_id).first()
-        service_exists = db.query(Service).filter(Service.id == obj_in.service_id, Service.tenant_id == tenant_id).first()
-        
-        if not customer_exists or not service_exists:
+        if not customer_exists:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid relational references. Customer or Service does not exist within your salon workspace."
+                detail="Invalid relational references. Customer does not exist within your salon workspace."
             )
 
+        # Validate each requested service belongs to tenant
+        service_ids = [s.service_id for s in obj_in.services]
+        services = db.query(Service).filter(Service.id.in_(service_ids), Service.tenant_id == tenant_id).all()
+        if len(services) != len(service_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more requested services do not exist within your salon workspace."
+            )
+
+        # Prepare booking payload (map user_id -> stylist_id)
+        payload = obj_in.model_dump()
+        payload.pop("services", None)
+        user_id = payload.pop("user_id", None)
+        if user_id is not None:
+            payload["stylist_id"] = user_id
+
         db_obj = Booking(
-            **obj_in.model_dump(),
+            **payload,
             tenant_id=tenant_id,
             status="pending"  # Default fallback state
         )
         db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+
+        # Create BookingService association rows (snapshot price/duration)
+        service_map = {s.id: s for s in services}
+        for sid in service_ids:
+            svc = service_map.get(sid)
+            bs = BookingService(
+                tenant_id=tenant_id,
+                booking_id=db_obj.id,
+                service_id=svc.id,
+                price=svc.price,
+                duration_minutes=svc.duration_minutes,
+            )
+            db.add(bs)
+
         db.commit()
         db.refresh(db_obj)
         return db_obj

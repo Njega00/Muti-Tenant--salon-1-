@@ -6,6 +6,7 @@ from typing import List
 
 from app.db.connection import get_db
 from app.models.booking import Booking
+from app.models.booking_service import BookingService
 from app.models.customer import Customer
 from app.models.service import Service
 from app.models.tenant import Tenant
@@ -47,21 +48,23 @@ def get_dashboard_summary(
     cancelled_count = db.query(func.count(Booking.id)).filter(Booking.tenant_id == current_tenant.id, Booking.status == "cancelled").scalar() or 0
     
     # 2. Total revenue from completed orders
-    total_revenue = db.query(func.sum(Service.price)).\
-        join(Booking, Booking.service_id == Service.id).\
+    # Total revenue should sum the snapshot prices from booking_services for completed bookings
+    total_revenue = db.query(func.sum(BookingService.price)).\
+        join(Booking, BookingService.booking_id == Booking.id).\
         filter(Booking.tenant_id == current_tenant.id, Booking.status == "completed").\
         scalar() or 0.0
 
     # 3. Calculate popular service menu breakdowns
     popular_services_data = db.query(
         Service.name.label("service_name"),
-        func.count(Booking.id).label("bookings_count"),
-        func.sum(Service.price).label("total_revenue")
+        func.count(BookingService.id).label("bookings_count"),
+        func.sum(BookingService.price).label("total_revenue")
     ).\
-        join(Booking, Booking.service_id == Service.id).\
+        join(BookingService, BookingService.service_id == Service.id).\
+        join(Booking, BookingService.booking_id == Booking.id).\
         filter(Booking.tenant_id == current_tenant.id).\
         group_by(Service.id).\
-        order_by(func.count(Booking.id).desc()).\
+        order_by(func.count(BookingService.id).desc()).\
         limit(5).\
         all()
 

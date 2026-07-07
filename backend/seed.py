@@ -14,6 +14,7 @@ from app.models.user import User
 from app.models.service import Service
 from app.models.customer import Customer
 from app.models.booking import Booking
+from app.models.booking_service import BookingService
 
  
 
@@ -151,24 +152,40 @@ def seed_database():
             booking_1 = Booking(
                 tenant_id=tenant.id,
                 customer_id=created_customers[0].id,
-                service_id=created_services[0].id,
                 stylist_id=stylist.id,
                 start_time=base_time,
                 end_time=base_time + timedelta(minutes=created_services[0].duration_minutes),
                 status="confirmed"
             )
-            
+
             past_time = base_time - timedelta(days=2)
             booking_2 = Booking(
                 tenant_id=tenant.id,
                 customer_id=created_customers[1].id,
-                service_id=created_services[1].id,
                 stylist_id=stylist.id,
                 start_time=past_time,
                 end_time=past_time + timedelta(minutes=created_services[1].duration_minutes),
                 status="completed"
             )
             db.add_all([booking_1, booking_2])
+            db.flush()
+
+            # create booking_services snapshots
+            bs1 = BookingService(
+                tenant_id=tenant.id,
+                booking_id=booking_1.id,
+                service_id=created_services[0].id,
+                price=created_services[0].price,
+                duration_minutes=created_services[0].duration_minutes
+            )
+            bs2 = BookingService(
+                tenant_id=tenant.id,
+                booking_id=booking_2.id,
+                service_id=created_services[1].id,
+                price=created_services[1].price,
+                duration_minutes=created_services[1].duration_minutes
+            )
+            db.add_all([bs1, bs2])
 
         db.commit()
         print("✅ Database successfully populated with testing records!")

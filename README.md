@@ -1,4 +1,4 @@
-# Salon Multi-Tenant SaaS Platform (Backend Engine)
+# Salon Multi-Tenant Vertical  SaaS Platform (Backend  Engine)
 
 A robust, cloud-native, multi-tenant Software-as-a-Service (SaaS) platform built specifically for barbershops, beauty salons, and spa management. This unified backend engine allows multiple independent businesses (Tenants) to register, manage their unique staff schedules, process bookings, track sales, and access isolated dashboards under a single system architecture.
 
